@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alien Galaxy Escape: Gravity Well Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-purple: #bc13fe;
+            --danger-red: #ff3131;
+            --sun-gold: #ffcc00;
+            --bg-dark: #020208;
+            --panel-bg: rgba(0, 10, 30, 0.85);
+            --border-glow: rgba(0, 242, 255, 0.4);
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Rajdhani', sans-serif;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw; height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas { display: block; }
+
+        /* ── HUD TOP BAR ── */
+        .hud-bar {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: linear-gradient(180deg, rgba(0,5,20,0.95) 0%, transparent 100%);
+            border-bottom: 1px solid rgba(0,242,255,0.15);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .hud-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hud-label {
+            font-family: 'Orbitron', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: rgba(0, 242, 255, 0.5);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 0 12px var(--neon-blue), 0 0 24px rgba(0,242,255,0.4);
+            letter-spacing: 2px;
+        }
+
+        .hud-value.gold {
+            color: var(--sun-gold);
+            text-shadow: 0 0 12px var(--sun-gold), 0 0 24px rgba(255,204,0,0.4);
+        }
+
+        /* logo center */
+        .hud-logo {
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: rgba(255,255,255,0.2);
+            text-transform: uppercase;
+        }
+
+        /* speed meter */
+        .speed-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .speed-bar-track {
+            width: 80px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .speed-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f2ff, #bc13fe);
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        /* ── GRAVITY WARNING BOTTOM ── */
+        #gravity-warning {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--neon-blue);
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-weight: 700;
+            pointer-events: none;
+            z-index: 20;
+            padding: 8px 20px;
+            border: 1px solid rgba(0,242,255,0.2);
+            border-radius: 4px;
+            background: rgba(0,10,30,0.6);
+            backdrop-filter: blur(4px);
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+
+        .warning-active {
+            animation: pulse-red 0.5s infinite alternate;
+            border-color: rgba(255,49,49,0.5) !important;
+            background: rgba(30,0,0,0.7) !important;
+        }
+
+        @keyframes pulse-red {
+            from { color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue); }
+            to   { color: var(--danger-red); text-shadow: 0 0 20px var(--danger-red); }
+        }
+
+        /* ── CORNER DECORATIONS ── */
+        .corner {
+            position: absolute;
+            width: 24px; height: 24px;
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0.5;
+        }
+        .corner-tl { top: 68px; left: 8px; border-top: 2px solid var(--neon-blue); border-left: 2px solid var(--neon-blue); }
+        .corner-tr { top: 68px; right: 8px; border-top: 2px solid var(--neon-blue); border-right: 2px solid var(--neon-blue); }
+        .corner-bl { bottom: 8px; left: 8px; border-bottom: 2px solid var(--neon-blue); border-left: 2px solid var(--neon-blue); }
+        .corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--neon-blue); border-right: 2px solid var(--neon-blue); }
+
+        /* ── OVERLAY (Start / Game Over) ── */
+        #overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(ellipse at center, rgba(0,10,40,0.97) 0%, rgba(0,0,5,0.99) 100%);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            gap: 0;
+        }
+
+        .overlay-badge {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            letter-spacing: 6px;
+            color: rgba(0,242,255,0.6);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        #status-title {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(28px, 5vw, 54px);
+            font-weight: 900;
+            color: var(--danger-red);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            text-shadow: 0 0 30px var(--danger-red), 0 0 60px rgba(255,49,49,0.4);
+            margin: 0 0 8px 0;
+            line-height: 1;
+        }
+
+        #status-title.success {
+            color: var(--sun-gold);
+            text-shadow: 0 0 30px var(--sun-gold), 0 0 60px rgba(255,204,0,0.4);
+        }
+
+        .overlay-divider {
+            width: 200px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+            margin: 20px auto;
+        }
+
+        #final-score {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(14px, 2.5vw, 18px);
+            color: rgba(255,255,255,0.7);
+            letter-spacing: 2px;
+            margin: 0 0 6px 0;
+        }
+
+        #final-best {
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            color: var(--sun-gold);
+            letter-spacing: 2px;
+            margin: 0 0 36px 0;
+            opacity: 0.8;
+        }
+
+        .btn-group { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+        .btn {
+            padding: 14px 40px;
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            background: transparent;
+            color: var(--neon-blue);
+            border: 1px solid var(--neon-blue);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-transform: uppercase;
+            pointer-events: auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--neon-blue);
+            transform: translateX(-100%);
+            transition: transform 0.25s;
+            z-index: -1;
+        }
+
+        .btn:hover::before { transform: translateX(0); }
+        .btn:hover { color: #000; box-shadow: 0 0 30px var(--neon-blue); }
+
+        .btn.secondary {
+            color: rgba(255,255,255,0.4);
+            border-color: rgba(255,255,255,0.15);
+            font-size: 11px;
+        }
+        .btn.secondary::before { background: rgba(255,255,255,0.1); }
+        .btn.secondary:hover { color: white; box-shadow: none; }
+
+        .controls-hint {
+            margin-top: 32px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.25);
+            letter-spacing: 2px;
+        }
+        .controls-hint span { color: rgba(0,242,255,0.5); }
+
+        /* scanning line effect on overlay */
+        #overlay::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, rgba(0,242,255,0.5) 50%, transparent 100%);
+            animation: scan-line 3s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan-line {
+            0%  { top: 0; opacity: 1; }
+            95% { opacity: 0.3; }
+            100%{ top: 100%; opacity: 0; }
+        }
+
+        /* ── START SCREEN extras ── */
+        .start-title {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(20px, 4vw, 42px);
+            font-weight: 900;
+            letter-spacing: 5px;
+            background: linear-gradient(135deg, #00f2ff 0%, #bc13fe 50%, #ffcc00 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+            margin: 0 0 4px 0;
+            text-align: center;
+        }
+
+        .start-sub {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            letter-spacing: 8px;
+            color: rgba(255,255,255,0.3);
+            text-transform: uppercase;
+            margin-bottom: 32px;
+        }
+
+        .feature-pills {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 16px 0 32px;
+        }
+        .pill {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            letter-spacing: 2px;
+            padding: 4px 14px;
+            border: 1px solid rgba(0,242,255,0.2);
+            border-radius: 20px;
+            color: rgba(0,242,255,0.6);
+            background: rgba(0,242,255,0.05);
+        }
+
+        /* ── COMBO FLASH ── */
+        #combo-flash {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--sun-gold);
+            text-shadow: 0 0 20px var(--sun-gold);
+            pointer-events: none;
+            z-index: 25;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        #combo-flash.show {
+            animation: combo-anim 1s ease-out forwards;
+        }
+        @keyframes combo-anim {
+            0%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.2); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(0.9); }
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+
+    <!-- TOP HUD -->
+    <div class="hud-bar">
+        <div class="hud-block">
+            <div class="hud-label">Score</div>
+            <div class="hud-value" id="score-display">000</div>
+        </div>
+        <div class="hud-logo">AGE</div>
+        <div class="hud-block" style="align-items:flex-end;">
+            <div class="hud-label">Best</div>
+            <div class="hud-value gold" id="high-score-display">000</div>
+        </div>
+    </div>
+
+    <!-- CORNER BRACKETS -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- GRAVITY WARNING -->
+    <div id="gravity-warning">SCANNING FOR SPATIAL ANOMALIES...</div>
+
+    <!-- COMBO FLASH -->
+    <div id="combo-flash">SECTOR CLEARED +1</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- OVERLAY -->
+    <div id="overlay">
+        <div class="overlay-badge" id="overlay-badge">MISSION STATUS</div>
+        <h1 id="status-title">MISSION FAILED</h1>
+        <div class="overlay-divider"></div>
+        <p id="final-score">Final Score: 0</p>
+        <p id="final-best"></p>
+        <div class="btn-group">
+            <button class="btn" onclick="resetGame()">⚡ INITIATE JUMP</button>
+        </div>
+        <div class="controls-hint">
+            <span>SPACE / TAP / CLICK</span> — FIRE THRUSTERS
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score-display');
+    const highScoreEl = document.getElementById('high-score-display');
+    const overlay = document.getElementById('overlay');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalBestEl = document.getElementById('final-best');
+    const warningEl = document.getElementById('gravity-warning');
+    const statusTitle = document.getElementById('status-title');
+    const overlayBadge = document.getElementById('overlay-badge');
+    const comboFlash = document.getElementById('combo-flash');
+
+    const BASE_GRAVITY = 0.26;
+    const JUMP_FORCE = -6.2;
+    const OBSTACLE_SPACING = 420;
+    const SHIP_WIDTH = 80;
+    const SHIP_HEIGHT = 55;
+    const GRAVITY_CONSTANT = 0.006;
+
+    let gameState = 'START';
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('solar_escape_highscore_v3') || '0');
+    let gameSpeed = 3.8;
+
+    let ship = { x: 150, y: 0, width: SHIP_WIDTH, height: SHIP_HEIGHT, velocity: 0, rotation: 0 };
+    let obstacles = [];
+    let stars = [];
+    let backgroundPlanets = [];
+    let particles = [];
+
+    const solarSystem = [
+        { name: "Sun",     primary: "#ffcc00", secondary: "#ff6600", atmosphere: "rgba(255,200,0,0.4)",   detail: "#ff9900", size: 140, speed: 0.1,  mass: 18 },
+        { name: "Mercury", primary: "#a5a5a5", secondary: "#4e4e4e", atmosphere: "rgba(150,150,150,0.1)", detail: "#333",    size: 30,  mass: 2  },
+        { name: "Venus",   primary: "#e3bb76", secondary: "#a57e3e", atmosphere: "rgba(255,230,150,0.2)", detail: "#8b6b32", size: 55,  mass: 4  },
+        { name: "Earth",   primary: "#2271b3", secondary: "#0d2c4a", atmosphere: "rgba(100,200,255,0.3)", detail: "#2d5a27", size: 60,  mass: 5  },
+        { name: "Mars",    primary: "#c1440e", secondary: "#451804", atmosphere: "rgba(255,100,0,0.2)",   detail: "#7d2b0a", size: 45,  mass: 3  },
+        { name: "Jupiter", primary: "#d8ca9d", secondary: "#a5947d", atmosphere: "rgba(200,180,150,0.2)", detail: "#7b614d", size: 110, mass: 14, rings: false },
+        { name: "Saturn",  primary: "#ead6b8", secondary: "#c5ab6e", atmosphere: "rgba(234,214,184,0.2)", detail: "#a5947d", size: 100, mass: 11, rings: true  },
+        { name: "Uranus",  primary: "#d1e7e7", secondary: "#4e9595", atmosphere: "rgba(200,255,255,0.2)", detail: "#93b8b8", size: 70,  mass: 8  },
+        { name: "Neptune", primary: "#297fff", secondary: "#001a4d", atmosphere: "rgba(0,150,255,0.3)",   detail: "#1a4f99", size: 68,  mass: 8  },
+        { name: "Pluto",   primary: "#efefef", secondary: "#7b7b7b", atmosphere: "rgba(255,255,255,0.1)", detail: "#444",    size: 25,  mass: 1  }
+    ];
+
+    function pad(n) { return String(n).padStart(3, '0'); }
+
+    function showCombo(text) {
+        comboFlash.textContent = text;
+        comboFlash.classList.remove('show');
+        void comboFlash.offsetWidth;
+        comboFlash.classList.add('show');
+    }
+
+    function spawnParticles(x, y, color) {
+        for (let i = 0; i < 14; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1 + Math.random() * 4;
+            particles.push({
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 1,
+                size: 2 + Math.random() * 3,
+                color
+            });
+        }
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx; p.y += p.vy;
+            p.life -= 0.035;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function drawParticles() {
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    function initStars() {
+        stars = [];
+        for (let i = 0; i < 220; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2,
+                speed: Math.random() * 0.4 + 0.05,
+                twinkle: Math.random() * Math.PI * 2
+            });
+        }
+    }
+
+    function initPlanets() {
+        backgroundPlanets = [];
+        let currentX = canvas.width + 100;
+        solarSystem.forEach(p => {
+            backgroundPlanets.push({
+                x: currentX,
+                y: 150 + Math.random() * (canvas.height - 300),
+                ...p,
+                speed: p.speed || (0.2 + Math.random() * 0.15),
+                seed: Math.random() * 100
+            });
+            currentX += (canvas.width / 1.2) + (p.size * 6);
+        });
+    }
+
+    function updateShip() {
+        if (gameState !== 'PLAYING') return;
+
+        let planetaryPull = 0;
+        let activeWarning = false;
+        let nearestPlanet = null;
+
+        backgroundPlanets.forEach(p => {
+            const dx = p.x - ship.x;
+            const dist = Math.abs(dx);
+            if (dist < 450) {
+                activeWarning = true;
+                if (!nearestPlanet || dist < Math.abs(nearestPlanet.x - ship.x)) nearestPlanet = p;
+                const dy = p.y - ship.y;
+                const strength = (1 - dist / 450) * p.mass * GRAVITY_CONSTANT;
+                planetaryPull += (dy > 0 ? strength : -strength);
+            }
+        });
+
+        if (activeWarning && nearestPlanet) {
+            const intensity = Math.round((1 - Math.abs(nearestPlanet.x - ship.x) / 450) * 100);
+            warningEl.innerText = `⚠ CRITICAL: ${nearestPlanet.name.toUpperCase()} GRAVITY WELL [${intensity}%]`;
+            warningEl.classList.toggle('warning-active', nearestPlanet.mass > 10);
+        } else {
+            warningEl.innerText = '◈ STATUS: DEEP SPACE CRUISE — CLEAR';
+            warningEl.classList.remove('warning-active');
+        }
+
+        let plasmaPull = 0;
+        obstacles.forEach(obs => {
+            if (obs.type === 3) {
+                const dx = obs.x + obs.width / 2 - ship.x;
+                if (Math.abs(dx) < 150) {
+                    const targetY = obs.gapY + obs.gap / 2;
+                    const dy = targetY - (ship.y + ship.height / 2);
+                    plasmaPull += dy * 0.02;
+                }
+            }
+        });
+
+        ship.velocity += (BASE_GRAVITY + planetaryPull + plasmaPull);
+        ship.y += ship.velocity;
+        ship.rotation = Math.min(Math.PI / 8, Math.max(-Math.PI / 8, ship.velocity * 0.04));
+
+        if (ship.y + ship.height > canvas.height || ship.y < 0) gameOver();
+    }
+
+    function drawShip() {
+        ctx.save();
+        ctx.translate(ship.x + ship.width / 2, ship.y + ship.height / 2);
+        ctx.rotate(ship.rotation);
+
+        // Engine glow trail
+        if (gameState === 'PLAYING') {
+            const pulse = Math.sin(Date.now() / 80) * 6;
+            const trailGrad = ctx.createRadialGradient(-42, 12, 0, -42, 12, 18 + pulse);
+            trailGrad.addColorStop(0, 'rgba(0,242,255,0.8)');
+            trailGrad.addColorStop(0.4, 'rgba(0,100,255,0.4)');
+            trailGrad.addColorStop(1, 'transparent');
+            ctx.fillStyle = trailGrad;
+            ctx.beginPath();
+            ctx.arc(-42, 12, 18 + pulse, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Saucer body
+        ctx.shadowBlur = 20; ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        const bodyGrad = ctx.createRadialGradient(-10, -5, 5, 0, 8, 40);
+        bodyGrad.addColorStop(0, '#d8d8d8');
+        bodyGrad.addColorStop(0.6, '#888');
+        bodyGrad.addColorStop(1, '#555');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 8, 40, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Dome
+        ctx.shadowBlur = 25; ctx.shadowColor = '#00f2ff';
+        const domeGrad = ctx.createRadialGradient(-8, -10, 2, 0, -2, 22);
+        domeGrad.addColorStop(0, 'rgba(200,255,255,0.7)');
+        domeGrad.addColorStop(0.5, 'rgba(0,242,255,0.35)');
+        domeGrad.addColorStop(1, 'rgba(0,100,200,0.1)');
+        ctx.fillStyle = domeGrad;
+        ctx.beginPath();
+        ctx.arc(0, -2, 22, Math.PI, 0);
+        ctx.fill();
+
+        // Alien head
+        ctx.shadowBlur = 0;
+        const headGrad = ctx.createRadialGradient(-3, -14, 2, 0, -10, 10);
+        headGrad.addColorStop(0, '#50e050');
+        headGrad.addColorStop(1, '#1a7a1a');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.arc(0, -10, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.ellipse(-4, -12, 2.5, 4, Math.PI / 10, 0, Math.PI * 2);
+        ctx.ellipse(4, -12, 2.5, 4, -Math.PI / 10, 0, Math.PI * 2);
+        ctx.fill();
+        // Eye shine
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.arc(-3, -13, 0.8, 0, Math.PI * 2);
+        ctx.arc(5, -13, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Engine lights
+        const pulse2 = Math.sin(Date.now() / 100) * 5;
+        const engColor = `hsl(${190 + pulse2 * 5}, 100%, 60%)`;
+        ctx.fillStyle = engColor;
+        ctx.shadowBlur = 12 + pulse2;
+        ctx.shadowColor = '#00f2ff';
+        [-25, 0, 25].forEach(ex => {
+            ctx.beginPath();
+            ctx.arc(ex, 14, 3.5 + pulse2 * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.restore();
+    }
+
+    class Obstacle {
+        constructor(x) {
+            this.x = x;
+            this.width = 85;
+            this.gap = 185;
+            this.type = Math.floor(Math.random() * 4);
+            this.gapY = 120 + Math.random() * (canvas.height - 240 - this.gap);
+            this.passed = false;
+            this.angle = 0;
+            this.debris = [];
+            if (this.type === 3) {
+                for (let i = 0; i < 15; i++) {
+                    this.debris.push({
+                        relY: Math.random() * canvas.height,
+                        size: 3 + Math.random() * 8,
+                        speed: 0.03 + Math.random() * 0.06,
+                        phase: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+        }
+        update() {
+            this.x -= gameSpeed;
+            this.angle += 0.05;
+            if (this.type === 3) this.gapY += Math.sin(Date.now() / 200) * 1.5;
+        }
+        draw() {
+            ctx.shadowBlur = 15;
+            switch (this.type) {
+                case 0:
+                    // Polished red asteroid walls
+                    const rg1 = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+                    rg1.addColorStop(0, '#8b0000'); rg1.addColorStop(0.5, '#ff3131'); rg1.addColorStop(1, '#8b0000');
+                    ctx.fillStyle = rg1; ctx.shadowColor = '#ff3131';
+                    ctx.fillRect(this.x, 0, this.width, this.gapY);
+                    ctx.fillRect(this.x, this.gapY + this.gap, this.width, canvas.height);
+                    // Edge highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillRect(this.x, 0, 3, this.gapY);
+                    ctx.fillRect(this.x, this.gapY + this.gap, 3, canvas.height);
+                    break;
+
+                case 1:
+                    ctx.fillStyle = '#7d614d'; ctx.shadowColor = '#7d614d';
+                    this.drawAsteroids(this.x + this.width / 2, this.gapY / 2);
+                    this.drawAsteroids(this.x + this.width / 2, this.gapY + this.gap + (canvas.height - this.gapY - this.gap) / 2);
+                    break;
+
+                case 2:
+                    const pg = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+                    pg.addColorStop(0, 'transparent'); pg.addColorStop(0.5, '#bc13fe'); pg.addColorStop(1, 'transparent');
+                    ctx.strokeStyle = pg; ctx.shadowColor = '#bc13fe';
+                    ctx.lineWidth = 5;
+                    ctx.strokeRect(this.x, 0, this.width, this.gapY);
+                    ctx.strokeRect(this.x, this.gapY + this.gap, this.width, canvas.height - (this.gapY + this.gap));
+                    // Inner glow fill
+                    ctx.fillStyle = 'rgba(188,19,254,0.08)';
+                    ctx.fillRect(this.x, 0, this.width, this.gapY);
+                    ctx.fillRect(this.x, this.gapY + this.gap, this.width, canvas.height - (this.gapY + this.gap));
+                    break;
+
+                case 3:
+                    const pulse = Math.sin(Date.now() / 50) * 15;
+                    ctx.shadowBlur = 30 + pulse; ctx.shadowColor = '#00f2ff';
+                    const grad = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+                    grad.addColorStop(0, 'rgba(0,242,255,0.15)');
+                    grad.addColorStop(0.5, 'rgba(255,255,255,0.85)');
+                    grad.addColorStop(1, 'rgba(0,242,255,0.15)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(this.x + 20, 0, 45, this.gapY);
+                    ctx.fillRect(this.x + 20, this.gapY + this.gap, 45, canvas.height);
+                    if (Math.random() > 0.7) {
+                        ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + 20, Math.random() * this.gapY);
+                        ctx.lineTo(this.x + 65, Math.random() * this.gapY);
+                        ctx.stroke();
+                    }
+                    ctx.shadowBlur = 0;
+                    this.debris.forEach(d => {
+                        const swirl = Math.sin(Date.now() * d.speed + d.phase) * 50;
+                        ctx.fillStyle = 'rgba(0,242,255,0.4)';
+                        ctx.beginPath();
+                        ctx.arc(this.x + 42 + swirl, d.relY, d.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                    break;
+            }
+            ctx.shadowBlur = 0;
+        }
+        drawAsteroids(cx, cy) {
+            ctx.save(); ctx.translate(cx, cy); ctx.rotate(this.angle);
+            for (let i = 0; i < 7; i++) {
+                const ang = (i / 7) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(Math.cos(ang) * 50, Math.sin(ang) * 50, 15, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+        checkCollision(ship) {
+            const b = 15;
+            const sR = { l: ship.x + b, r: ship.x + ship.width - b, t: ship.y + b, b: ship.y + ship.height - b };
+            if (sR.r > this.x && sR.l < this.x + this.width) {
+                if (sR.t < this.gapY || sR.b > this.gapY + this.gap) return true;
+            }
+            return false;
+        }
+    }
+
+    function drawPlanet(p) {
+        ctx.save();
+        const dx = p.x - ship.x;
+        if (Math.abs(dx) < 450) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 450, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0,242,255,${0.06 * (1 - Math.abs(dx) / 450)})`;
+            ctx.setLineDash([12, 18]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        ctx.shadowBlur = (p.name === "Sun") ? 90 : 45;
+        ctx.shadowColor = p.atmosphere;
+
+        if (p.rings) {
+            ctx.strokeStyle = "rgba(200,180,150,0.35)";
+            ctx.lineWidth = 18;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y, p.size * 2.3, p.size * 0.65, Math.PI / 6, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        const g = ctx.createRadialGradient(p.x - p.size / 3, p.y - p.size / 3, p.size / 10, p.x, p.y, p.size);
+        g.addColorStop(0, p.primary);
+        g.addColorStop(1, p.secondary);
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.clip();
+        ctx.fillStyle = p.detail;
+        ctx.globalAlpha = 0.3;
+        for (let i = 0; i < 10; i++) {
+            const dx_ = p.x + Math.sin(p.seed + i) * p.size;
+            const dy_ = p.y + Math.cos(p.seed * i) * p.size;
+            ctx.beginPath();
+            ctx.ellipse(dx_, dy_, p.size / 1.1, p.size / 4.5, p.seed + i, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const sg = ctx.createRadialGradient(p.x + p.size / 1.4, p.y + p.size / 1.4, 0, p.x, p.y, p.size);
+        sg.addColorStop(0, "rgba(0,0,0,0.7)");
+        sg.addColorStop(1, "transparent");
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = sg;
+        ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+        ctx.restore();
+
+        // Planet label — refined
+        ctx.save();
+        ctx.font = "700 12px 'Orbitron', monospace";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.letterSpacing = "2px";
+        ctx.fillText(`${p.name.toUpperCase()}`, p.x, p.y + p.size + 28);
+        ctx.font = "400 10px 'Rajdhani', sans-serif";
+        ctx.fillStyle = "rgba(0,242,255,0.4)";
+        ctx.fillText(`MASS: ${p.mass}`, p.x, p.y + p.size + 42);
+        ctx.restore();
+    }
+
+    function updateObstacles() {
+        if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < canvas.width - OBSTACLE_SPACING) {
+            obstacles.push(new Obstacle(canvas.width));
+        }
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            obstacles[i].update();
+            if (obstacles[i].checkCollision(ship)) {
+                spawnParticles(ship.x + ship.width / 2, ship.y + ship.height / 2, '#ff3131');
+                gameOver();
+            }
+            if (!obstacles[i].passed && obstacles[i].x + obstacles[i].width < ship.x) {
+                obstacles[i].passed = true;
+                score++;
+                scoreEl.innerText = pad(score);
+                spawnParticles(obstacles[i].x + obstacles[i].width / 2, obstacles[i].gapY + obstacles[i].gap / 2, '#00f2ff');
+                if (score % 5 === 0) showCombo(`SECTOR ${score} ✦`);
+                if (score > 0 && score % 8 === 0) gameSpeed += 0.3;
+            }
+            if (obstacles[i].x + obstacles[i].width < -200) obstacles.splice(i, 1);
+        }
+    }
+
+    function drawBackground() {
+        // Deep space fill
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        bgGrad.addColorStop(0, '#010108');
+        bgGrad.addColorStop(0.5, '#020210');
+        bgGrad.addColorStop(1, '#010108');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Nebula faint glow
+        const neb = ctx.createRadialGradient(canvas.width * 0.7, canvas.height * 0.3, 0, canvas.width * 0.7, canvas.height * 0.3, canvas.width * 0.5);
+        neb.addColorStop(0, 'rgba(100,0,150,0.04)');
+        neb.addColorStop(1, 'transparent');
+        ctx.fillStyle = neb;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Stars
+        const now = Date.now();
+        stars.forEach(s => {
+            s.x -= s.speed * (gameSpeed / 2);
+            if (s.x < 0) s.x = canvas.width;
+            s.twinkle += 0.04;
+            const alpha = 0.3 + Math.sin(s.twinkle) * 0.25;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "white";
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+        ctx.globalAlpha = 1.0;
+
+        backgroundPlanets.forEach(p => {
+            p.x -= p.speed * (gameSpeed / 3);
+            if (p.x < -1200) { p.x = canvas.width + 1200; p.y = 150 + Math.random() * (canvas.height - 300); }
+            drawPlanet(p);
+        });
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        initStars();
+        initPlanets();
+        if (gameState === 'START') ship.y = canvas.height / 2;
+    }
+
+    function showStartScreen() {
+        overlay.style.display = 'flex';
+        overlayBadge.innerText = 'GRAVITY WELL EDITION';
+        statusTitle.className = '';
+        statusTitle.innerText = '';
+        document.getElementById('final-score').style.display = 'none';
+        finalBestEl.style.display = 'none';
+
+        // Build start layout
+        statusTitle.innerHTML = '<div class="start-title">ALIEN GALAXY<br>ESCAPE</div>';
+        const sub = document.createElement('div');
+        sub.className = 'start-sub';
+        sub.innerText = 'Navigate the Cosmos';
+        const pills = document.createElement('div');
+        pills.className = 'feature-pills';
+        ['10 PLANETS', 'GRAVITY WELLS', 'PLASMA STORMS', 'ION THRUSTERS'].forEach(t => {
+            const p = document.createElement('div');
+            p.className = 'pill';
+            p.innerText = t;
+            pills.appendChild(p);
+        });
+        // Inject after title
+        overlay.insertBefore(sub, overlay.querySelector('.overlay-divider'));
+        overlay.querySelector('.overlay-divider').after(pills);
+
+        document.querySelector('.btn').innerText = '⚡ LAUNCH MISSION';
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+
+        // Clean up any start-screen injections
+        const sub = overlay.querySelector('.start-sub');
+        const pills = overlay.querySelector('.feature-pills');
+        if (sub) sub.remove();
+        if (pills) pills.remove();
+
+        overlay.style.display = 'flex';
+        document.getElementById('final-score').style.display = 'block';
+        finalBestEl.style.display = 'block';
+
+        finalScoreEl.innerText = `SCORE: ${pad(score)}`;
+
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('solar_escape_highscore_v3', highScore);
+            highScoreEl.innerText = pad(highScore);
+            overlayBadge.innerText = '✦ NEW RECORD ✦';
+            statusTitle.className = 'success';
+            statusTitle.innerHTML = 'NEW SECTOR<br>RECORD!';
+            finalBestEl.innerText = `PREVIOUS BEST SURPASSED`;
+            finalBestEl.style.color = 'var(--sun-gold)';
+        } else {
+            overlayBadge.innerText = 'MISSION STATUS';
+            statusTitle.className = '';
+            statusTitle.innerText = 'MISSION FAILED';
+            finalBestEl.innerText = `BEST: ${pad(highScore)}`;
+            finalBestEl.style.color = 'rgba(255,204,0,0.7)';
+        }
+        document.querySelector('.btn').innerText = '⚡ INITIATE JUMP';
+    }
+
+    function resetGame() {
+        // Clean up any start-screen injections
+        const sub = overlay.querySelector('.start-sub');
+        const pills = overlay.querySelector('.feature-pills');
+        if (sub) sub.remove();
+        if (pills) pills.remove();
+
+        score = 0;
+        gameSpeed = 3.8;
+        ship.y = canvas.height / 2;
+        ship.velocity = 0;
+        obstacles = [];
+        particles = [];
+        scoreEl.innerText = '000';
+        overlay.style.display = 'none';
+        gameState = 'PLAYING';
+    }
+
+    function handleInput() {
+        if (gameState === 'START') resetGame();
+        else if (gameState === 'PLAYING') ship.velocity = JUMP_FORCE;
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousedown', e => { if (e.target.tagName !== 'BUTTON') handleInput(); });
+    window.addEventListener('touchstart', e => { if (e.target.tagName !== 'BUTTON') { e.preventDefault(); handleInput(); } }, { passive: false });
+    window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') handleInput(); });
+
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBackground();
+
+        if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+            updateShip();
+            if (gameState === 'PLAYING') {
+                updateObstacles();
+                updateParticles();
+            }
+            obstacles.forEach(obs => obs.draw());
+            drawParticles();
+            drawShip();
+        } else {
+            drawShip();
+            // Pulsing start prompt on canvas
+            const alpha = 0.4 + Math.sin(Date.now() / 500) * 0.3;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.font = "700 16px 'Orbitron', monospace";
+            ctx.textAlign = "center";
+            ctx.fillStyle = 'rgba(0,242,255,1)';
+            ctx.fillText("PRESS SPACE OR TAP TO LAUNCH", canvas.width / 2, canvas.height - 90);
+            ctx.restore();
+        }
+        requestAnimationFrame(gameLoop);
+    }
+
+    resize();
+    highScoreEl.innerText = pad(highScore);
+    showStartScreen();
+    gameLoop();
+</script>
+</body>
+</html>
