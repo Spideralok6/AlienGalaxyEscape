@@ -35,7 +35,7 @@ open index.html
 4. Save — your game will be live at:
 
 ```
-https://YOUR_USERNAME.github.io/AlienGalaxyEscape/
+https://Spideralok6.github.io/AlienGalaxyEscape/
 ```
 
 ## 🛠️ Built With
